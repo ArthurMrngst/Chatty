@@ -1,45 +1,45 @@
 package com.CO1102.Chatty
 
+
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.Alignment
+import java.text.SimpleDateFormat
+import java.util.*
+
 @Composable
-fun ChatScreen(user: User, onBackClick: () -> Unit) {
+fun GroupChatScreen(
+    group: Group,
+    onBackClick: () -> Unit
+) {
 
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
 
     val currentUserId = auth.currentUser?.uid ?: return
 
-    var messageText by remember { mutableStateOf("") }
     var messages by remember { mutableStateOf(listOf<Message>()) }
+    var messageText by remember { mutableStateOf("") }
 
-    val chatRoomId =
-        if (currentUserId < user.uid)
-            "${currentUserId}_${user.uid}"
-        else
-            "${user.uid}_${currentUserId}"
-
+    // 🔥 Load messages
     LaunchedEffect(true) {
-        db.collection("chats")
-            .document(chatRoomId)
+        db.collection("groups")
+            .document(group.id)
             .collection("messages")
             .orderBy("timestamp")
             .addSnapshotListener { snapshot, _ ->
 
                 if (snapshot != null) {
                     messages = snapshot.documents
-                        .mapNotNull { it.toObject(Message::class.java)}
-                        .sortedByDescending { it.timestamp }
-
+                        .mapNotNull { it.toObject(Message::class.java) }
                 }
             }
     }
@@ -47,80 +47,94 @@ fun ChatScreen(user: User, onBackClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(12.dp)
     ) {
 
+        // 🔙 HEADER
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             Text(
                 text = "←",
-                style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier
-                    .padding(end = 8.dp)
                     .clickable { onBackClick() }
+                    .padding(end = 8.dp),
+                style = MaterialTheme.typography.headlineMedium
             )
 
             Text(
-                text = user.email,
+                text = group.name,
                 style = MaterialTheme.typography.headlineSmall
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        // 💬 MESSAGE LIST
         LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
+            modifier = Modifier.weight(1f),
             reverseLayout = true
         ) {
 
-            items(messages) { message ->
+            items(messages.reversed()) { message ->
 
-                val isCurrentUser = message.senderId == currentUserId
+                val isMe = message.senderId == currentUserId
 
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement =
-                        if (isCurrentUser) Arrangement.End
-                        else Arrangement.Start
+                    horizontalAlignment =
+                        if (isMe) Alignment.End else Alignment.Start
                 ) {
+
+                    // 👤 Sender name (important for group chat)
+                    if (!isMe) {
+                        Text(
+                            text = message.senderId, // later we can replace with email
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
 
                     Surface(
                         color =
-                            if (isCurrentUser)
+                            if (isMe)
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.surfaceVariant,
-
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier
-                            .padding(6.dp)
+                            .padding(4.dp)
                             .widthIn(max = 250.dp)
                     ) {
 
-                        Text(
-                            text = message.text,
-                            modifier = Modifier.padding(12.dp),
-                            color =
-                                if (isCurrentUser)
-                                    MaterialTheme.colorScheme.onPrimary
-                                else
-                                    MaterialTheme.colorScheme.onSurface
-                        )
+                        Column(modifier = Modifier.padding(8.dp)) {
+
+                            Text(
+                                text = message.text,
+                                color =
+                                    if (isMe)
+                                        MaterialTheme.colorScheme.onPrimary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = SimpleDateFormat("HH:mm", Locale.getDefault())
+                                    .format(Date(message.timestamp)),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row {
+        // ✍️ INPUT
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
 
             OutlinedTextField(
                 value = messageText,
@@ -133,7 +147,6 @@ fun ChatScreen(user: User, onBackClick: () -> Unit) {
 
             Button(
                 onClick = {
-
                     if (messageText.isNotBlank()) {
 
                         val message = Message(
@@ -142,8 +155,8 @@ fun ChatScreen(user: User, onBackClick: () -> Unit) {
                             timestamp = System.currentTimeMillis()
                         )
 
-                        db.collection("chats")
-                            .document(chatRoomId)
+                        db.collection("groups")
+                            .document(group.id)
                             .collection("messages")
                             .add(message)
 

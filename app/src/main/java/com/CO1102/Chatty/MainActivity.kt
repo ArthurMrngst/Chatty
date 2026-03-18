@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
 
                 var currentScreen by remember { mutableStateOf("login") }
                 var selectedChatUser by remember { mutableStateOf<User?>(null) }
-
+                var selectedGroup by remember { mutableStateOf<Group?>(null) }
                 when (currentScreen) {
 
                     "login" -> LoginScreen(
@@ -49,13 +49,33 @@ class MainActivity : ComponentActivity() {
                             onUserClick = { selectedUser ->
                                 selectedChatUser = selectedUser
                                 currentScreen = "chat"
+                            },
+                            onGroupClick = { group ->
+                                selectedGroup = group
+                                currentScreen = "groupChat"
+
                             }
                         )
                     }
 
                     "chat" -> {
                         selectedChatUser?.let { user ->
-                            ChatScreen(user)
+                            ChatScreen(
+                                user = user,
+                                onBackClick = {
+                                    currentScreen = "home"   // 👈 go back to HomeScreen
+                                }
+                            )
+                        }
+                    }
+                    "groupChat" -> {
+                        selectedGroup?.let { group ->
+                            GroupChatScreen(
+                                group = group,
+                                onBackClick = {
+                                    currentScreen = "home"
+                                }
+                            )
                         }
                     }
                 }
