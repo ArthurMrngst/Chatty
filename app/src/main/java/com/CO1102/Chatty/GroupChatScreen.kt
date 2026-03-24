@@ -30,6 +30,7 @@ fun GroupChatScreen(
     var messages by remember { mutableStateOf(listOf<Message>()) }
     var messageText by remember { mutableStateOf("") }
     var userMap by remember { mutableStateOf(mapOf<String, String>()) }
+    var typingUsers by remember { mutableStateOf(listOf<String>()) }
 
     // 🔥 Load messages (REAL-TIME)
     LaunchedEffect(group.id) {
@@ -66,6 +67,25 @@ fun GroupChatScreen(
         }
     }
 
+    LaunchedEffect(group.id) {
+
+        db.collection("groups")
+            .document(group.id)
+            .collection("typing")
+            .addSnapshotListener { snapshot, _ ->
+
+                if (snapshot != null) {
+
+                    val typingList = snapshot.documents
+                        .filter { it.getBoolean("typing") == true }
+                        .mapNotNull { it.id }
+                        .filter { it != currentUserId } // ❗ exclude yourself
+
+                    typingUsers = typingList
+                }
+            }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -90,14 +110,29 @@ fun GroupChatScreen(
                     style = MaterialTheme.typography.headlineSmall
                 )
 
+                val memberNames = group.members.map {
+                    userMap[it] ?: "Unknown"
+                }.joinToString(", ")
+
                 Text(
-                    text = "Members: ${group.members.size}",
+                    text = memberNames,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
+
+        if (typingUsers.isNotEmpty()) {
+
+            val typingText = typingUsers.joinToString(", ")
+
+            Text(
+                text = "$typingText is typing...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
         // 💬 EMPTY STATE
         if (messages.isEmpty()) {
@@ -178,7 +213,15 @@ fun GroupChatScreen(
 
             OutlinedTextField(
                 value = messageText,
-                onValueChange = { messageText = it },
+                onValueChange = {
+                    messageText = it
+
+                    db.collection("groups")
+                        .document(group.id)
+                        .collection("typing")
+                        .document(currentUserId)
+                        .set(mapOf("typing" to it.isNotEmpty()))
+                },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Type message") }
             )
@@ -195,15 +238,23 @@ fun GroupChatScreen(
                             timestamp = System.currentTimeMillis()
                         )
 
+                        // 🔥 SEND MESSAGE
                         db.collection("groups")
                             .document(group.id)
                             .collection("messages")
                             .add(message)
 
+                        // 🔥 STOP TYPING
+                        db.collection("groups")
+                            .document(group.id)
+                            .collection("typing")
+                            .document(currentUserId)
+                            .set(mapOf("typing" to false))
+
                         messageText = ""
                     }
                 }
-            ) {
+            )    {
                 Text("Send")
             }
         }

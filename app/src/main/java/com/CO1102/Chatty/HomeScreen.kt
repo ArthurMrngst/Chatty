@@ -28,6 +28,9 @@ fun HomeScreen(
 
     var showDialog by remember { mutableStateOf(false) }
     var groupName by remember { mutableStateOf("") }
+    var selectedUsers by remember { mutableStateOf(setOf<String>()) }
+    var groupLastMessages by remember { mutableStateOf(mapOf<String, String>()) }
+    var groupUnreadCounts by remember { mutableStateOf(mapOf<String, Int>()) }
 
     // 🔹 Load users
     LaunchedEffect(true) {
@@ -82,7 +85,28 @@ fun HomeScreen(
                         group?.copy(id = it.id)
                     }
                 }
+
             }
+    }
+    LaunchedEffect(groups) {
+
+        groups.forEach { group ->
+
+            db.collection("groups")
+                .document(group.id)
+                .collection("messages")
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(1)
+                .addSnapshotListener { snapshot, _ ->
+
+                    val lastMessage = snapshot?.documents
+                        ?.firstOrNull()
+                        ?.getString("text") ?: ""
+
+                    groupLastMessages =
+                        groupLastMessages + (group.id to lastMessage)
+                }
+        }
     }
 
     // 🔹 UI
@@ -143,55 +167,165 @@ fun HomeScreen(
 
             // 👥 GROUP LIST
             items(groups) { group ->
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onGroupClick(group) }
                         .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("👥 ${group.name}")
+
+                    // LEFT SIDE
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        Surface(
+                            shape = MaterialTheme.shapes.large,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = group.name.take(1).uppercase(),
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Text("👥 ${group.name}")
+
+                            Text(
+                                text = groupLastMessages[group.id] ?: "No messages yet",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // RIGHT SIDE (unread count)
+                    val count = groupUnreadCounts[group.id] ?: 0
+
+                    if (count > 0) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = count.toString(),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
                 }
-                Divider()
+
+                Divider() // ✅ INSIDE items block
             }
         }
     }
 
     // 🔹 Create Group Dialog
     if (showDialog) {
+
         AlertDialog(
             onDismissRequest = { showDialog = false },
             title = { Text("Create Group") },
             text = {
-                OutlinedTextField(
-                    value = groupName,
-                    onValueChange = { groupName = it },
-                    placeholder = { Text("Enter group name") }
-                )
+
+                Column {
+
+                    // 📝 Group name
+                    OutlinedTextField(
+                        value = groupName,
+                        onValueChange = { groupName = it },
+                        placeholder = { Text("Enter group name") }
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text("Select Members:")
+
+                    // 👥 USER LIST
+                    LazyColumn(
+                        modifier = Modifier.height(200.dp)
+                    ) {
+                        items(users) { user ->
+
+                            val isSelected = selectedUsers.contains(user.uid)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedUsers =
+                                            if (isSelected)
+                                                selectedUsers - user.uid
+                                            else
+                                                selectedUsers + user.uid
+                                    }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = {
+                                        selectedUsers =
+                                            if (isSelected)
+                                                selectedUsers - user.uid
+                                            else
+                                                selectedUsers + user.uid
+                                    }
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(user.email)
+                            }
+                        }
+                    }
+                }
             },
+
+            // ✅ CREATE BUTTON
             confirmButton = {
                 Button(
                     onClick = {
+
                         val uid = currentUser?.uid ?: return@Button
 
                         if (groupName.isNotBlank()) {
+
+                            val members = selectedUsers.toMutableList()
+                            members.add(uid) // 🔥 always include yourself
+
                             val newGroup = hashMapOf(
                                 "name" to groupName,
-                                "members" to listOf(uid)
+                                "members" to members
                             )
 
                             db.collection("groups").add(newGroup)
                         }
 
+                        // reset
                         groupName = ""
+                        selectedUsers = emptySet()
                         showDialog = false
                     }
                 ) {
                     Text("Create")
                 }
             },
+
             dismissButton = {
-                Button(onClick = { showDialog = false }) {
+                Button(onClick = {
+                    showDialog = false
+                    selectedUsers = emptySet()
+                }) {
                     Text("Cancel")
                 }
             }
