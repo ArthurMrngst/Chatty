@@ -14,6 +14,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import coil.compose.rememberAsyncImagePainter
+import androidx.compose.foundation.Image
 
 @Composable
 fun GroupChatScreen(
@@ -31,6 +36,14 @@ fun GroupChatScreen(
     var messageText by remember { mutableStateOf("") }
     var userMap by remember { mutableStateOf(mapOf<String, String>()) }
     var typingUsers by remember { mutableStateOf(listOf<String>()) }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        imageUri = uri
+    }
+    
 
     // 🔥 Load messages (REAL-TIME)
     LaunchedEffect(group.id) {
@@ -182,14 +195,27 @@ fun GroupChatScreen(
 
                             Column(modifier = Modifier.padding(8.dp)) {
 
-                                Text(
-                                    text = message.text,
-                                    color =
-                                        if (isMe)
-                                            MaterialTheme.colorScheme.onPrimary
-                                        else
-                                            MaterialTheme.colorScheme.onSurface
-                                )
+                                if (message.imageUrl.isNotEmpty()) {
+
+                                    Image(
+                                        painter = rememberAsyncImagePainter(message.imageUrl),
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(200.dp)
+                                            .padding(4.dp)
+                                    )
+
+                                } else {
+
+                                    Text(
+                                        text = message.text,
+                                        color =
+                                            if (isMe)
+                                                MaterialTheme.colorScheme.onPrimary
+                                            else
+                                                MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
 
                                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -211,6 +237,16 @@ fun GroupChatScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
+            // 📷 IMAGE BUTTON
+            Button(
+                onClick = { launcher.launch("image/*") }
+            ) {
+                Text("📷")
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // ✍️ TEXT FIELD
             OutlinedTextField(
                 value = messageText,
                 onValueChange = {
@@ -228,6 +264,7 @@ fun GroupChatScreen(
 
             Spacer(modifier = Modifier.width(8.dp))
 
+            // 📤 SEND BUTTON
             Button(
                 onClick = {
                     if (messageText.isNotBlank()) {
@@ -238,13 +275,12 @@ fun GroupChatScreen(
                             timestamp = System.currentTimeMillis()
                         )
 
-                        // 🔥 SEND MESSAGE
                         db.collection("groups")
                             .document(group.id)
                             .collection("messages")
                             .add(message)
 
-                        // 🔥 STOP TYPING
+                        // stop typing
                         db.collection("groups")
                             .document(group.id)
                             .collection("typing")
@@ -254,9 +290,49 @@ fun GroupChatScreen(
                         messageText = ""
                     }
                 }
-            )    {
+            ) {
                 Text("Send")
             }
         }
+        imageUri?.let { uri ->
+
+            uploadImage(uri, group.id) { url ->
+
+                val message = Message(
+                    senderId = currentUserId,
+                    imageUrl = url,
+                    timestamp = System.currentTimeMillis()
+                )
+
+                db.collection("groups")
+                    .document(group.id)
+                    .collection("messages")
+                    .add(message)
+            }
+
+            imageUri = null
+        }
     }
+}
+fun uploadImage(
+    uri: Uri,
+    groupId: String,
+    onSuccess: (String) -> Unit
+) {
+    val storage = com.google.firebase.storage.FirebaseStorage.getInstance()
+
+    val ref = storage.reference.child(
+        "group_chats/$groupId/${System.currentTimeMillis()}"
+    )
+
+    ref.putFile(uri)
+        .continueWithTask { task ->
+            if (!task.isSuccessful) {
+                throw task.exception ?: Exception("Upload failed")
+            }
+            ref.downloadUrl
+        }
+        .addOnSuccessListener { downloadUrl ->
+            onSuccess(downloadUrl.toString())
+        }
 }
