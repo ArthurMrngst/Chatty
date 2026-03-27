@@ -36,12 +36,28 @@ fun GroupChatScreen(
     var messageText by remember { mutableStateOf("") }
     var userMap by remember { mutableStateOf(mapOf<String, String>()) }
     var typingUsers by remember { mutableStateOf(listOf<String>()) }
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var replyingMessage by remember { mutableStateOf<Message?>(null) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        imageUri = uri
+
+        uri?.let {
+
+            uploadImage(it, group.id) { url ->
+
+                val message = Message(
+                    senderId = currentUserId,
+                    imageUrl = url,
+                    timestamp = System.currentTimeMillis()
+                )
+
+                db.collection("groups")
+                    .document(group.id)
+                    .collection("messages")
+                    .add(message)
+            }
+        }
     }
     
 
@@ -191,9 +207,38 @@ fun GroupChatScreen(
                             modifier = Modifier
                                 .padding(4.dp)
                                 .widthIn(max = 250.dp)
+                                .clickable {
+                                    replyingMessage = message
+                                }
                         ) {
 
                             Column(modifier = Modifier.padding(8.dp)) {
+
+                                if (message.replyToText.isNotEmpty()) {
+
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 4.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(6.dp)) {
+
+                                            Text(
+                                                text = userMap[message.replyToSender] ?: "User",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+
+                                            Text(
+                                                text = message.replyToText,
+                                                maxLines = 1,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                }
+
+
 
                                 if (message.imageUrl.isNotEmpty()) {
 
@@ -232,6 +277,40 @@ fun GroupChatScreen(
         }
 
         // ✍️ INPUT AREA
+        replyingMessage?.let { reply ->
+
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+
+                    Column {
+                        Text(
+                            text = "Replying to ${userMap[reply.senderId] ?: "User"}",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+
+                        Text(
+                            text = if (reply.text.isNotEmpty()) reply.text else "📷 Image",
+                            maxLines = 1
+                        )
+                    }
+
+                    Text(
+                        text = "❌",
+                        modifier = Modifier.clickable {
+                            replyingMessage = null
+                        }
+                    )
+                }
+            }
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -272,7 +351,10 @@ fun GroupChatScreen(
                         val message = Message(
                             senderId = currentUserId,
                             text = messageText,
-                            timestamp = System.currentTimeMillis()
+                            timestamp = System.currentTimeMillis(),
+
+                            replyToText = replyingMessage?.text ?: "",
+                            replyToSender = replyingMessage?.senderId ?: ""
                         )
 
                         db.collection("groups")
@@ -288,30 +370,16 @@ fun GroupChatScreen(
                             .set(mapOf("typing" to false))
 
                         messageText = ""
+
+                        replyingMessage = null
                     }
                 }
             ) {
                 Text("Send")
             }
         }
-        imageUri?.let { uri ->
 
-            uploadImage(uri, group.id) { url ->
 
-                val message = Message(
-                    senderId = currentUserId,
-                    imageUrl = url,
-                    timestamp = System.currentTimeMillis()
-                )
-
-                db.collection("groups")
-                    .document(group.id)
-                    .collection("messages")
-                    .add(message)
-            }
-
-            imageUri = null
-        }
     }
 }
 fun uploadImage(
@@ -322,10 +390,18 @@ fun uploadImage(
     val storage = com.google.firebase.storage.FirebaseStorage.getInstance()
 
     val ref = storage.reference.child(
-        "group_chats/$groupId/${System.currentTimeMillis()}"
+        "group_chats/$groupId/${System.currentTimeMillis()}.jpg"
     )
 
+    println("🚀 Upload started")
+
     ref.putFile(uri)
+        .addOnSuccessListener {
+            println("✅ Upload success")
+        }
+        .addOnFailureListener {
+            println("❌ Upload failed: ${it.message}")
+        }
         .continueWithTask { task ->
             if (!task.isSuccessful) {
                 throw task.exception ?: Exception("Upload failed")
@@ -333,6 +409,7 @@ fun uploadImage(
             ref.downloadUrl
         }
         .addOnSuccessListener { downloadUrl ->
+            println("🔥 Download URL: $downloadUrl")
             onSuccess(downloadUrl.toString())
         }
 }
