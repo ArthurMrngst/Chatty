@@ -19,6 +19,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import coil.compose.rememberAsyncImagePainter
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 
 @Composable
 fun GroupChatScreen(
@@ -37,6 +38,7 @@ fun GroupChatScreen(
     var userMap by remember { mutableStateOf(mapOf<String, String>()) }
     var typingUsers by remember { mutableStateOf(listOf<String>()) }
     var replyingMessage by remember { mutableStateOf<Message?>(null) }
+    var messageToDelete by remember { mutableStateOf<Message?>(null) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -70,8 +72,10 @@ fun GroupChatScreen(
             .addSnapshotListener { snapshot, _ ->
 
                 if (snapshot != null) {
-                    messages = snapshot.documents
-                        .mapNotNull { it.toObject(Message::class.java) }
+                    messages = snapshot.documents.mapNotNull { doc ->
+                        val msg = doc.toObject(Message::class.java)
+                        msg?.copy(id = doc.id)
+                    }
                 }
             }
     }
@@ -207,9 +211,16 @@ fun GroupChatScreen(
                             modifier = Modifier
                                 .padding(4.dp)
                                 .widthIn(max = 250.dp)
-                                .clickable {
-                                    replyingMessage = message
-                                }
+                                .combinedClickable(
+                                    onClick = {
+                                        replyingMessage = message
+                                    },
+                                    onLongClick = {
+                                        if (isMe) {
+                                            messageToDelete = message
+                                        }
+                                    }
+                                )
                         ) {
 
                             Column(modifier = Modifier.padding(8.dp)) {
@@ -277,6 +288,41 @@ fun GroupChatScreen(
         }
 
         // ✍️ INPUT AREA
+        messageToDelete?.let { msg ->
+
+            AlertDialog(
+                onDismissRequest = { messageToDelete = null },
+
+                title = {
+                    Text("Delete message?")
+                },
+
+                text = {
+                    Text("This message will be deleted for everyone.")
+                },
+
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            deleteMessage(group.id, msg.id)
+                            messageToDelete = null
+                        }
+                    ) {
+                        Text("Delete")
+                    }
+                },
+
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            messageToDelete = null
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
         replyingMessage?.let { reply ->
 
             Surface(
@@ -412,4 +458,13 @@ fun uploadImage(
             println("🔥 Download URL: $downloadUrl")
             onSuccess(downloadUrl.toString())
         }
+}
+fun deleteMessage(groupId: String, messageId: String) {
+    val db = FirebaseFirestore.getInstance()
+
+    db.collection("groups")
+        .document(groupId)
+        .collection("messages")
+        .document(messageId)
+        .delete()
 }

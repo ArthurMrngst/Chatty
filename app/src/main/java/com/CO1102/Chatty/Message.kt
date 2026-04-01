@@ -1,6 +1,7 @@
 package com.CO1102.Chatty
 
 data class Message(
+    val id: String = "",
     val senderId: String = "",
     val text: String = "",
     val imageUrl: String = "",
