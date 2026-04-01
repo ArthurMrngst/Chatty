@@ -39,6 +39,8 @@ fun GroupChatScreen(
     var typingUsers by remember { mutableStateOf(listOf<String>()) }
     var replyingMessage by remember { mutableStateOf<Message?>(null) }
     var messageToDelete by remember { mutableStateOf<Message?>(null) }
+    var editingMessage by remember { mutableStateOf<Message?>(null) }
+    var messageOptions by remember { mutableStateOf<Message?>(null) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -217,7 +219,7 @@ fun GroupChatScreen(
                                     },
                                     onLongClick = {
                                         if (isMe) {
-                                            messageToDelete = message
+                                            messageOptions = message
                                         }
                                     }
                                 )
@@ -249,7 +251,12 @@ fun GroupChatScreen(
                                     }
                                 }
 
-
+                                if (message.edited) {
+                                    Text(
+                                        text = "(edited)",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
 
                                 if (message.imageUrl.isNotEmpty()) {
 
@@ -288,6 +295,44 @@ fun GroupChatScreen(
         }
 
         // ✍️ INPUT AREA
+        messageOptions?.let { msg ->
+
+            AlertDialog(
+                onDismissRequest = { messageOptions = null },
+
+                title = { Text("Message options") },
+
+                text = {
+                    Column {
+                        Text(
+                            text = "Edit",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    editingMessage = msg
+                                    messageText = msg.text
+                                    messageOptions = null
+                                }
+                                .padding(8.dp)
+                        )
+
+                        Text(
+                            text = "Delete",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    messageToDelete = msg
+                                    messageOptions = null
+                                }
+                                .padding(8.dp)
+                        )
+                    }
+                },
+
+                confirmButton = {},
+                dismissButton = {}
+            )
+        }
         messageToDelete?.let { msg ->
 
             AlertDialog(
@@ -394,34 +439,45 @@ fun GroupChatScreen(
                 onClick = {
                     if (messageText.isNotBlank()) {
 
-                        val message = Message(
-                            senderId = currentUserId,
-                            text = messageText,
-                            timestamp = System.currentTimeMillis(),
+                        if (editingMessage != null) {
+                            // ✏️ UPDATE MESSAGE
+                            db.collection("groups")
+                                .document(group.id)
+                                .collection("messages")
+                                .document(editingMessage!!.id)
+                                .update(
+                                    mapOf(
+                                        "text" to messageText,
+                                        "edited" to true
+                                    )
+                                )
 
-                            replyToText = replyingMessage?.text ?: "",
-                            replyToSender = replyingMessage?.senderId ?: ""
-                        )
+                            editingMessage = null
 
-                        db.collection("groups")
-                            .document(group.id)
-                            .collection("messages")
-                            .add(message)
+                        } else {
+                            // 📤 NORMAL SEND
+                            val message = Message(
+                                senderId = currentUserId,
+                                text = messageText,
+                                timestamp = System.currentTimeMillis(),
 
-                        // stop typing
-                        db.collection("groups")
-                            .document(group.id)
-                            .collection("typing")
-                            .document(currentUserId)
-                            .set(mapOf("typing" to false))
+                                replyToText = replyingMessage?.text ?: "",
+                                replyToSender = replyingMessage?.senderId ?: ""
+                            )
 
+                            db.collection("groups")
+                                .document(group.id)
+                                .collection("messages")
+                                .add(message)
+                        }
+
+                        // reset
                         messageText = ""
-
                         replyingMessage = null
                     }
                 }
             ) {
-                Text("Send")
+                Text(if (editingMessage != null) "Update" else "Send")
             }
         }
 

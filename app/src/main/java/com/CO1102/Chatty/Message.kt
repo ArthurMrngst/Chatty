@@ -8,6 +8,7 @@ data class Message(
     val gifUrl: String = "",
     val timestamp: Long = 0,
     val replyToText: String = "",
-    val replyToSender: String = ""
+    val replyToSender: String = "",
+    val edited: Boolean = false
 )
 
