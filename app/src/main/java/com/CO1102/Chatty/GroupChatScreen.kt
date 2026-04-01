@@ -218,9 +218,11 @@ fun GroupChatScreen(
                                         replyingMessage = message
                                     },
                                     onLongClick = {
-                                        if (isMe) {
                                             messageOptions = message
-                                        }
+
+                                    },
+                                    onDoubleClick = {
+                                        reactToMessage(group.id, message.id, currentUserId, "❤️")
                                     }
                                 )
                         ) {
@@ -287,6 +289,29 @@ fun GroupChatScreen(
                                         .format(Date(message.timestamp)),
                                     style = MaterialTheme.typography.labelSmall
                                 )
+                                if (message.reactions.isNotEmpty()) {
+
+                                    Row(
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    ) {
+                                        message.reactions.values
+                                            .groupBy { it }
+                                            .forEach { (emoji, users) ->
+
+                                                Surface(
+                                                    shape = MaterialTheme.shapes.small,
+                                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                                    modifier = Modifier.padding(end = 4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "$emoji ${users.size}",
+                                                        modifier = Modifier.padding(4.dp),
+                                                        style = MaterialTheme.typography.labelSmall
+                                                    )
+                                                }
+                                            }
+                                    }
+                                }
                             }
                         }
                     }
@@ -304,28 +329,51 @@ fun GroupChatScreen(
 
                 text = {
                     Column {
-                        Text(
-                            text = "Edit",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    editingMessage = msg
-                                    messageText = msg.text
-                                    messageOptions = null
-                                }
-                                .padding(8.dp)
-                        )
+                        Row {
+                            listOf("👍","❤️","😂","😮","😢","😡").forEach { emoji ->
 
-                        Text(
-                            text = "Delete",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    messageToDelete = msg
-                                    messageOptions = null
-                                }
-                                .padding(8.dp)
-                        )
+                                Text(
+                                    text = emoji,
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .clickable {
+                                            reactToMessage(
+                                                group.id,
+                                                msg.id,
+                                                currentUserId,
+                                                emoji
+                                            )
+                                            messageOptions = null
+                                        }
+                                )
+                            }
+                        }
+                        if (msg.senderId == currentUserId) {
+                                Text(
+                                text = "Edit",
+
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        editingMessage = msg
+                                        messageText = msg.text
+                                        messageOptions = null
+                                    }
+                                    .padding(8.dp)
+                            )
+                        }
+                        if (msg.senderId == currentUserId) {
+                            Text(
+                                text = "Delete",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        messageToDelete = msg
+                                        messageOptions = null
+                                    }
+                                    .padding(8.dp)
+                            )
+                        }
                     }
                 },
 
@@ -523,4 +571,35 @@ fun deleteMessage(groupId: String, messageId: String) {
         .collection("messages")
         .document(messageId)
         .delete()
+}
+fun reactToMessage(
+    groupId: String,
+    messageId: String,
+    userId: String,
+    emoji: String
+) {
+    val db = FirebaseFirestore.getInstance()
+
+    val ref = db.collection("groups")
+        .document(groupId)
+        .collection("messages")
+        .document(messageId)
+
+    db.runTransaction { transaction ->
+
+        val snapshot = transaction.get(ref)
+
+        val reactions =
+            snapshot.get("reactions") as? MutableMap<String, String>
+                ?: mutableMapOf()
+
+        if (reactions[userId] == emoji) {
+            // remove reaction if same emoji tapped again
+            reactions.remove(userId)
+        } else {
+            reactions[userId] = emoji
+        }
+
+        transaction.update(ref, "reactions", reactions)
+    }
 }

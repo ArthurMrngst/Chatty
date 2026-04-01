@@ -9,6 +9,7 @@ data class Message(
     val timestamp: Long = 0,
     val replyToText: String = "",
     val replyToSender: String = "",
-    val edited: Boolean = false
+    val edited: Boolean = false,
+    val reactions: Map<String, String> = emptyMap()
 )
 
