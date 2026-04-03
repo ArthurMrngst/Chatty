@@ -67,7 +67,9 @@ fun RegisterScreen(
                             val userData = hashMapOf(
                                 "uid" to user?.uid,
                                 "email" to user?.email,
-                                "createdAt" to System.currentTimeMillis()
+                                "createdAt" to System.currentTimeMillis(),
+                                "online" to true,
+                                "lastseen" to null
                             )
 
                             db.collection("users")

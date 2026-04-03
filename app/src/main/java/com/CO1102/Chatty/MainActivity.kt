@@ -82,6 +82,31 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    override fun onStart() {
+        super.onStart()
+
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(uid)
+            .update("online", true)
+    }
+    override fun onStop() {
+        super.onStop()
+
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(uid)
+            .update(
+                mapOf(
+                    "online" to false,
+                    "lastSeen" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                )
+            )
+    }
 }
 
 @Composable

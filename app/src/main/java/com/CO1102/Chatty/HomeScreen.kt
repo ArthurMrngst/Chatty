@@ -32,14 +32,15 @@ fun HomeScreen(
     var groupLastMessages by remember { mutableStateOf(mapOf<String, String>()) }
     var groupUnreadCounts by remember { mutableStateOf(mapOf<String, Int>()) }
 
-    // 🔹 Load users
+    // 🔥 REAL-TIME USERS (UPDATED)
     LaunchedEffect(true) {
         db.collection("users")
-            .get()
-            .addOnSuccessListener { result ->
-                users = result.documents.mapNotNull {
-                    it.toObject(User::class.java)
-                }.filter { it.uid != currentUser?.uid }
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    users = snapshot.documents.mapNotNull {
+                        it.toObject(User::class.java)
+                    }.filter { it.uid != currentUser?.uid }
+                }
             }
     }
 
@@ -69,7 +70,7 @@ fun HomeScreen(
         }
     }
 
-    // 🔹 Load groups (ONLY groups you belong to)
+    // 🔹 Load groups
     LaunchedEffect(true) {
         val uid = currentUser?.uid ?: return@LaunchedEffect
 
@@ -85,9 +86,10 @@ fun HomeScreen(
                         group?.copy(id = it.id)
                     }
                 }
-
             }
     }
+
+    // 🔹 Group last messages
     LaunchedEffect(groups) {
 
         groups.forEach { group ->
@@ -95,7 +97,7 @@ fun HomeScreen(
             db.collection("groups")
                 .document(group.id)
                 .collection("messages")
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(1)
                 .addSnapshotListener { snapshot, _ ->
 
@@ -116,7 +118,6 @@ fun HomeScreen(
             .padding(16.dp)
     ) {
 
-        // ✅ Create Group Button
         Button(
             onClick = { showDialog = true },
             modifier = Modifier.fillMaxWidth()
@@ -128,7 +129,6 @@ fun HomeScreen(
 
         LazyColumn {
 
-            // 👤 USERS TITLE
             item {
                 Text(
                     text = "Users",
@@ -136,26 +136,59 @@ fun HomeScreen(
                 )
             }
 
-            // 👤 USERS LIST
+            // 🔥 USERS LIST WITH ONLINE STATUS
             items(users) { user ->
+
+                val isOnline = user.online
+
+                val lastSeenText = user.lastSeen?.toDate()?.let {
+                    val diff = System.currentTimeMillis() - it.time
+                    val minutes = diff / 60000
+
+                    when {
+                        minutes < 1 -> "Just now"
+                        minutes < 60 -> "$minutes min ago"
+                        else -> "${minutes / 60} hr ago"
+                    }
+                } ?: ""
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onUserClick(user) }
                         .padding(vertical = 12.dp)
                 ) {
-                    Text("👤 ${user.email}")
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        Text("👤 ${user.email}")
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = if (isOnline) "🟢 Online" else "⚫ Offline",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
 
                     Text(
                         text = lastMessages[user.uid] ?: "No messages yet",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    if (!isOnline && lastSeenText.isNotEmpty()) {
+                        Text(
+                            text = "Last seen $lastSeenText",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
+
                 Divider()
             }
 
-            // 👥 GROUP TITLE
             item {
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -165,7 +198,6 @@ fun HomeScreen(
                 )
             }
 
-            // 👥 GROUP LIST
             items(groups) { group ->
 
                 Row(
@@ -177,7 +209,6 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
 
-                    // LEFT SIDE
                     Row(verticalAlignment = Alignment.CenterVertically) {
 
                         Surface(
@@ -206,7 +237,6 @@ fun HomeScreen(
                         }
                     }
 
-                    // RIGHT SIDE (unread count)
                     val count = groupUnreadCounts[group.id] ?: 0
 
                     if (count > 0) {
@@ -223,12 +253,12 @@ fun HomeScreen(
                     }
                 }
 
-                Divider() // ✅ INSIDE items block
+                Divider()
             }
         }
     }
 
-    // 🔹 Create Group Dialog
+    // 🔹 Create Group Dialog (UNCHANGED)
     if (showDialog) {
 
         AlertDialog(
@@ -238,7 +268,6 @@ fun HomeScreen(
 
                 Column {
 
-                    // 📝 Group name
                     OutlinedTextField(
                         value = groupName,
                         onValueChange = { groupName = it },
@@ -249,7 +278,6 @@ fun HomeScreen(
 
                     Text("Select Members:")
 
-                    // 👥 USER LIST
                     LazyColumn(
                         modifier = Modifier.height(200.dp)
                     ) {
@@ -291,7 +319,6 @@ fun HomeScreen(
                 }
             },
 
-            // ✅ CREATE BUTTON
             confirmButton = {
                 Button(
                     onClick = {
@@ -301,7 +328,7 @@ fun HomeScreen(
                         if (groupName.isNotBlank()) {
 
                             val members = selectedUsers.toMutableList()
-                            members.add(uid) // 🔥 always include yourself
+                            members.add(uid)
 
                             val newGroup = hashMapOf(
                                 "name" to groupName,
@@ -311,7 +338,6 @@ fun HomeScreen(
                             db.collection("groups").add(newGroup)
                         }
 
-                        // reset
                         groupName = ""
                         selectedUsers = emptySet()
                         showDialog = false
