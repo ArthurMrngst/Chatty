@@ -6,10 +6,11 @@ data class Message(
     val text: String = "",
     val imageUrl: String = "",
     val gifUrl: String = "",
-    val timestamp: Long = 0,
+    val timestamp: com.google.firebase.Timestamp? = null,
     val replyToText: String = "",
     val replyToSender: String = "",
     val edited: Boolean = false,
-    val reactions: Map<String, String> = emptyMap()
+    val reactions: Map<String, String> = emptyMap(),
+    val seenBy: List<String> = emptyList()
 )
 

@@ -53,13 +53,17 @@ fun GroupChatScreen(
                 val message = Message(
                     senderId = currentUserId,
                     imageUrl = url,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = null
                 )
 
                 db.collection("groups")
                     .document(group.id)
                     .collection("messages")
                     .add(message)
+                    .addOnSuccessListener { doc ->
+
+                        doc.update("timestamp", com.google.firebase.firestore.FieldValue.serverTimestamp())
+                    }
             }
         }
     }
@@ -79,7 +83,25 @@ fun GroupChatScreen(
                         msg?.copy(id = doc.id)
                     }
                 }
+
+
             }
+    }
+    LaunchedEffect(messages) {
+        messages.forEach { msg ->
+
+            if (!msg.seenBy.contains(currentUserId)) {
+
+                db.collection("groups")
+                    .document(group.id)
+                    .collection("messages")
+                    .document(msg.id)
+                    .update(
+                        "seenBy",
+                        com.google.firebase.firestore.FieldValue.arrayUnion(currentUserId)
+                    )
+            }
+        }
     }
 
     // 🔥 Load users (for email display)
@@ -118,6 +140,7 @@ fun GroupChatScreen(
 
                     typingUsers = typingList
                 }
+
             }
     }
 
@@ -285,10 +308,17 @@ fun GroupChatScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
 
                                 Text(
-                                    text = SimpleDateFormat("HH:mm", Locale.getDefault())
-                                        .format(Date(message.timestamp)),
+                                    text = message.timestamp?.toDate()?.let {
+                                        SimpleDateFormat("HH:mm", Locale.getDefault()).format(it)
+                                    } ?: "",
                                     style = MaterialTheme.typography.labelSmall
                                 )
+                                if (message.senderId == currentUserId && message.seenBy.isNotEmpty()) {
+                                    Text(
+                                        text = "Seen by ${message.seenBy.size}",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                                 if (message.reactions.isNotEmpty()) {
 
                                     Row(
@@ -308,9 +338,12 @@ fun GroupChatScreen(
                                                         modifier = Modifier.padding(4.dp),
                                                         style = MaterialTheme.typography.labelSmall
                                                     )
+
                                                 }
+
                                             }
                                     }
+
                                 }
                             }
                         }
@@ -507,7 +540,7 @@ fun GroupChatScreen(
                             val message = Message(
                                 senderId = currentUserId,
                                 text = messageText,
-                                timestamp = System.currentTimeMillis(),
+                                timestamp = null,
 
                                 replyToText = replyingMessage?.text ?: "",
                                 replyToSender = replyingMessage?.senderId ?: ""
@@ -517,6 +550,13 @@ fun GroupChatScreen(
                                 .document(group.id)
                                 .collection("messages")
                                 .add(message)
+                                .addOnSuccessListener { doc ->
+
+                                    doc.update(
+                                        "timestamp",
+                                        com.google.firebase.firestore.FieldValue.serverTimestamp()
+                                    )
+                                }
                         }
 
                         // reset
