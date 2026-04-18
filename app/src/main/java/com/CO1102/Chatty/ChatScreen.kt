@@ -139,7 +139,7 @@ fun ChatScreen(user: User, onBackClick: () -> Unit) {
                         val message = Message(
                             senderId = currentUserId,
                             text = messageText,
-                            timestamp = System.currentTimeMillis()
+                            timestamp = null
                         )
 
                         db.collection("chats")

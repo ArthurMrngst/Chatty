@@ -312,7 +312,19 @@ fun HomeScreen(
 
                                 Spacer(modifier = Modifier.width(8.dp))
 
-                                Text(user.email)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+
+                                    Text("👤 ${user.email}")
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    val isOnline = user.online
+
+                                    Text(
+                                        text = if (isOnline) "🟢 Online" else "⚫ Offline",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
                             }
                         }
                     }

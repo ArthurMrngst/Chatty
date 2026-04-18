@@ -11,6 +11,8 @@ data class Message(
     val replyToSender: String = "",
     val edited: Boolean = false,
     val reactions: Map<String, String> = emptyMap(),
-    val seenBy: List<String> = emptyList()
+    val seenBy: List<String> = emptyList(),
+    val audioUrl: String = "",
+    val audioDuration: Long = 0
 )
 
