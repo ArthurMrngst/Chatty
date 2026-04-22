@@ -46,6 +46,9 @@ fun GroupChatScreen(
     var isRecording by remember { mutableStateOf(false) }
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var audioFilePath by remember { mutableStateOf("") }
+    var showPollDialog by remember { mutableStateOf(false) }
+    var pollQuestion by remember { mutableStateOf("") }
+    var pollOptionsInput by remember { mutableStateOf("") }
 
     // 🎤 Permission
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -103,7 +106,7 @@ fun GroupChatScreen(
             val file = File(context.cacheDir, "${System.currentTimeMillis()}.3gp")
             audioFilePath = file.absolutePath
 
-            recorder = MediaRecorder().apply {
+            recorder = MediaRecorder(context).apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
@@ -217,10 +220,70 @@ fun GroupChatScreen(
                                     SimpleDateFormat("HH:mm", Locale.getDefault()).format(it)
                                 } ?: ""
                             )
+
+
+                            if (message.pollQuestion.isNotEmpty()) {
+                                PollMessageUI(message, group.id, currentUserId)
+                            }
+
                         }
                     }
                 }
             }
+        }
+        if (showPollDialog) {
+            AlertDialog(
+                onDismissRequest = { showPollDialog = false },
+                title = { Text("Create Poll") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = pollQuestion,
+                            onValueChange = { pollQuestion = it },
+                            label = { Text("Question") }
+                        )
+
+                        OutlinedTextField(
+                            value = pollOptionsInput,
+                            onValueChange = { pollOptionsInput = it },
+                            label = { Text("Options (comma separated)") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+
+                        val optionsList = pollOptionsInput.split(",").map { it.trim() }
+                        val optionsMap = optionsList.associateWith { 0L }
+
+                        val message = Message(
+                            senderId = currentUserId,
+                            pollQuestion = pollQuestion,
+                            pollOptions = optionsMap
+                        )
+
+                        db.collection("groups")
+                            .document(group.id)
+                            .collection("messages")
+                            .add(message)
+                            .addOnSuccessListener {
+                                it.update("timestamp", FieldValue.serverTimestamp())
+                            }
+
+                        pollQuestion = ""
+                        pollOptionsInput = ""
+                        showPollDialog = false
+
+                    }) {
+                        Text("Create")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPollDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
 
         // INPUT BAR
@@ -239,7 +302,9 @@ fun GroupChatScreen(
             )
 
             Spacer(Modifier.width(6.dp))
-
+            Button(onClick = { showPollDialog = true }) {
+                Text("📊")
+            }
             Button(onClick = {
                 if (messageText.isNotBlank()) {
 
@@ -259,7 +324,9 @@ fun GroupChatScreen(
 
                     messageText = ""
                 }
-            }) {
+            })
+
+            {
                 Text("Send")
             }
 
@@ -346,3 +413,70 @@ fun uploadAudio(uri: Uri, groupId: String, onSuccess: (String) -> Unit) {
         ref.downloadUrl
     }.addOnSuccessListener { onSuccess(it.toString()) }
 }
+@Composable
+fun PollMessageUI(
+    message: Message,
+    groupId: String,
+    currentUserId: String
+) {
+    val db = FirebaseFirestore.getInstance()
+
+    Column(modifier = Modifier.padding(8.dp)) {
+
+        Text(
+            text = message.pollQuestion,
+            style = MaterialTheme.typography.titleMedium
+        )
+        val totalVotes = message.pollOptions.values.sum()
+
+        message.pollOptions.forEach { (option, countLong) ->
+
+            val count = countLong
+            val votedOption = message.pollVotes[currentUserId]
+
+            val percentage =
+                if (totalVotes == 0L) 0f
+                else count.toFloat() / totalVotes.toFloat()
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+
+                        val newVotes = message.pollVotes.toMutableMap()
+                        val newOptions = message.pollOptions.toMutableMap()
+
+                        if (votedOption != null) {
+                            newOptions[votedOption] =
+                                (newOptions[votedOption] ?: 1L) - 1L
+                        }
+
+                        newVotes[currentUserId] = option
+                        newOptions[option] =
+                            (newOptions[option] ?: 0L) + 1L
+
+                        db.collection("groups")
+                            .document(groupId)
+                            .collection("messages")
+                            .document(message.id)
+                            .update(
+                                mapOf(
+                                    "pollVotes" to newVotes,
+                                    "pollOptions" to newOptions
+                                )
+                            )
+                    }
+                    .padding(vertical = 6.dp)
+            ) {
+
+                Text("$option ($count)")
+
+                LinearProgressIndicator(
+                    progress = percentage,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+

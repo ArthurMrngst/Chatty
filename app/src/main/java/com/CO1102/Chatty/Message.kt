@@ -14,5 +14,8 @@ data class Message(
     val seenBy: List<String> = emptyList(),
     val audioUrl: String = "",
     val audioDuration: Long = 0,
+    val pollQuestion: String = "",
+    val pollOptions: Map<String, Long> = mapOf(),
+    val pollVotes: Map<String, String> = mapOf(),
 )
 
