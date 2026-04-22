@@ -13,6 +13,6 @@ data class Message(
     val reactions: Map<String, String> = emptyMap(),
     val seenBy: List<String> = emptyList(),
     val audioUrl: String = "",
-    val audioDuration: Long = 0
+    val audioDuration: Long = 0,
 )
 
