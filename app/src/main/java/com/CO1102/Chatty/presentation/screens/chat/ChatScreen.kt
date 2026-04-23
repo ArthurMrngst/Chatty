@@ -1,4 +1,4 @@
-package com.CO1102.Chatty
+package com.CO1102.Chatty.presentation.screens.chat
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +11,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
+import com.CO1102.Chatty.domain.model.Message
+import com.CO1102.Chatty.domain.model.User
+
 @Composable
 fun ChatScreen(user: User, onBackClick: () -> Unit) {
 

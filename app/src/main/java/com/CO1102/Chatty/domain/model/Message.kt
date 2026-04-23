@@ -1,4 +1,6 @@
-package com.CO1102.Chatty
+package com.CO1102.Chatty.domain.model
+
+import com.google.firebase.Timestamp
 
 data class Message(
     val id: String = "",
@@ -6,7 +8,7 @@ data class Message(
     val text: String = "",
     val imageUrl: String = "",
     val gifUrl: String = "",
-    val timestamp: com.google.firebase.Timestamp? = null,
+    val timestamp: Timestamp? = null,
     val replyToText: String = "",
     val replyToSender: String = "",
     val edited: Boolean = false,
@@ -18,4 +20,3 @@ data class Message(
     val pollOptions: Map<String, Long> = mapOf(),
     val pollVotes: Map<String, String> = mapOf(),
 )
-

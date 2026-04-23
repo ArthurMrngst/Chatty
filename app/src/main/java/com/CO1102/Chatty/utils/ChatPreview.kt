@@ -1,5 +1,4 @@
-package com.CO1102.Chatty
-
+package com.CO1102.Chatty.utils
 
 data class ChatPreview(
     val userId: String = "",

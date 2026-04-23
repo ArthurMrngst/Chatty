@@ -1,4 +1,4 @@
-package com.CO1102.Chatty
+package com.CO1102.Chatty.presentation
 
 import android.os.Bundle
 import android.util.Log
@@ -9,8 +9,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.CO1102.Chatty.domain.model.Group
+import com.CO1102.Chatty.domain.model.User
+import com.CO1102.Chatty.presentation.screens.chat.ChatScreen
+import com.CO1102.Chatty.presentation.screens.chat.GroupChatScreen
+import com.CO1102.Chatty.presentation.screens.HomeScreen
+import com.CO1102.Chatty.presentation.screens.auth.LoginScreen
+import com.CO1102.Chatty.presentation.screens.auth.RegisterScreen
 import com.CO1102.Chatty.ui.theme.ChattyTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 
@@ -124,7 +132,7 @@ class MainActivity : ComponentActivity() {
             .set(
                 mapOf(
                     "online" to false,
-                    "lastSeen" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                    "lastSeen" to FieldValue.serverTimestamp()
                 ),
                 SetOptions.merge() // ✅ FIX
             )

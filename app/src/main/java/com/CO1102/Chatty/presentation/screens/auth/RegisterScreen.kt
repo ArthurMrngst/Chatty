@@ -1,17 +1,16 @@
-package com.CO1102.Chatty
+package com.CO1102.Chatty.presentation.screens.auth
 
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
-fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    onGoToRegister: () -> Unit
+fun RegisterScreen(
+    onRegisterSuccess: () -> Unit
 ) {
     val auth = FirebaseAuth.getInstance()
 
@@ -27,7 +26,7 @@ fun LoginScreen(
     ) {
 
         Text(
-            text = "Login",
+            text = "Register",
             style = MaterialTheme.typography.headlineMedium
         )
 
@@ -56,26 +55,39 @@ fun LoginScreen(
             onClick = {
                 errorMessage = ""
 
-                auth.signInWithEmailAndPassword(email, password)
+                auth.createUserWithEmailAndPassword(email, password)
                     .addOnCompleteListener { task ->
+
                         if (task.isSuccessful) {
-                            Log.d("Auth", "Login successful")
-                            onLoginSuccess()
+
+                            val db = FirebaseFirestore.getInstance()
+                            val user = auth.currentUser
+
+                            val userData = hashMapOf(
+                                "uid" to user?.uid,
+                                "email" to user?.email,
+                                "createdAt" to System.currentTimeMillis(),
+                                "online" to true,
+                                "lastseen" to null
+                            )
+
+                            db.collection("users")
+                                .document(user!!.uid)
+                                .set(userData)
+                                .addOnSuccessListener {
+                                    onRegisterSuccess()
+                                }
+
                         } else {
                             errorMessage =
-                                task.exception?.message ?: "Login failed"
+                                task.exception?.message ?: "Registration failed"
                         }
                     }
             }
         ) {
-            Text("Login")
+            Text("Register")
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        TextButton(onClick = { onGoToRegister() }) {
-            Text("Don't have an account? Register")
-        }
 
         if (errorMessage.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))

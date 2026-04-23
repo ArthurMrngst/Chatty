@@ -1,4 +1,4 @@
-package com.CO1102.Chatty
+package com.CO1102.Chatty.utils
 
 import android.content.Context
 import android.media.MediaRecorder
