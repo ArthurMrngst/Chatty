@@ -1,4 +1,4 @@
-package com.CO1102.Chatty.presentation.screens
+package com.CO1102.Chatty.presentation.screens.chat
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,10 +15,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 
+
 @Composable
 fun HomeScreen(
     onUserClick: (User) -> Unit,
-    onGroupClick: (Group) -> Unit
+    onGroupClick: (Group) -> Unit,
+    onMeClick: () -> Unit ={},
+    onPeopleClick: () -> Unit = {}
 ) {
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
@@ -128,6 +131,15 @@ fun HomeScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        MessengerBottomNav(
+            activeIndex = 1,
+            onTabClick = { index ->
+                when (index) {
+                    1 -> onPeopleClick()
+                    3 -> onMeClick()   // 👤 Me tab
+                }
+            }
+        )
 
         LazyColumn {
 
@@ -368,7 +380,9 @@ fun HomeScreen(
                 }) {
                     Text("Cancel")
                 }
-            }
+            },
+
+
         )
     }
 }

@@ -14,9 +14,19 @@ data class Message(
     val edited: Boolean = false,
     val reactions: Map<String, String> = emptyMap(),
     val seenBy: List<String> = emptyList(),
+
     val audioUrl: String = "",
     val audioDuration: Long = 0,
+
     val pollQuestion: String = "",
-    val pollOptions: Map<String, Long> = mapOf(),
-    val pollVotes: Map<String, String> = mapOf(),
+    val pollOptions: Map<String, Long> = emptyMap(),  // option text → vote count
+    val pollVotes: Map<String, String> = emptyMap(),   // userId → option they voted
+
+    val electionNominee: String = "",
+    val electionNomineeDisplay: String = "",
+    val electionNominator: String = "",
+    val electionNominatorDisplay: String = "",
+    val electionYesVotes: List<String> = emptyList(),
+    val electionNoVotes: List<String> = emptyList(),
+    val electionResolved: Boolean = false,
 )

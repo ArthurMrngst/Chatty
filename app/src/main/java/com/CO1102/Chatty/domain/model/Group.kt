@@ -5,5 +5,6 @@ data class Group(
     val name: String = "",
     val members: List<String> = listOf(),
     val admins: List<String> = listOf(),
-    val mutedUsers: List<String> = listOf()
+    val mutedUsers: List<String> = listOf(),
+    val isDirectChat: Boolean = false
 )

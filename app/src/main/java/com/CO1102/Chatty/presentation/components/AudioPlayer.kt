@@ -1,107 +1,105 @@
-
-
 package com.CO1102.Chatty.presentation.components
 
 import android.media.MediaPlayer
-import android.util.Log
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-@Composable
-fun AudioPlayer(
-    audioUrl: String
-) {
-    var isPlaying by remember { mutableStateOf(false) }
-    var isPrepared by remember { mutableStateOf(false) }
-    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
-    // 🔥 Clean up when composable leaves screen
-    DisposableEffect(Unit) {
+@Composable
+fun AudioPlayer(url: String) {
+    // Track player state
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMsg by remember { mutableStateOf("") }
+
+    // Clean up player when composable leaves screen
+    DisposableEffect(url) {
         onDispose {
-            try {
-                mediaPlayer?.release()
-                mediaPlayer = null
-            } catch (e: Exception) {
-                Log.e("AudioPlayer", "Release error: ${e.message}")
-            }
+            mediaPlayer?.release()
+            mediaPlayer = null
         }
     }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(4.dp)
+        modifier = Modifier.padding(vertical = 4.dp)
     ) {
-
+        // Play / Pause / Stop button
         Button(
             onClick = {
-
-                if (mediaPlayer == null) {
-                    mediaPlayer = MediaPlayer().apply {
-
-                        try {
-                            setDataSource(audioUrl)
-
+                if (isPlaying) {
+                    // STOP
+                    mediaPlayer?.stop()
+                    mediaPlayer?.release()
+                    mediaPlayer = null
+                    isPlaying = false
+                } else {
+                    // PLAY
+                    isLoading = true
+                    errorMsg = ""
+                    try {
+                        val player = MediaPlayer().apply {
+                            setDataSource(url)
                             setOnPreparedListener {
-                                isPrepared = true
-                                start()
+                                isLoading = false
                                 isPlaying = true
+                                start()
                             }
-
                             setOnCompletionListener {
                                 isPlaying = false
+                                release()
+                                mediaPlayer = null
                             }
-
-                            prepareAsync()
-
-                        } catch (e: Exception) {
-                            Log.e("AudioPlayer", "Error: ${e.message}")
+                            setOnErrorListener { _, _, _ ->
+                                isLoading = false
+                                isPlaying = false
+                                errorMsg = "Playback failed"
+                                true
+                            }
+                            prepareAsync() // non-blocking — safe for network URLs
                         }
-                    }
-                } else {
-                    mediaPlayer?.let { player ->
-                        if (player.isPlaying) {
-                            player.pause()
-                            isPlaying = false
-                        } else {
-                            player.start()
-                            isPlaying = true
-                        }
+                        mediaPlayer = player
+                    } catch (e: Exception) {
+                        isLoading = false
+                        errorMsg = "Cannot play audio"
                     }
                 }
-            }
+            },
+            modifier = Modifier.size(48.dp),
+            contentPadding = PaddingValues(0.dp)
         ) {
             Text(
-                when {
-                    !isPrepared && mediaPlayer != null -> "Loading..."
-                    isPlaying -> "⏸ Pause"
-                    else -> "▶ Play"
+                text = when {
+                    isLoading -> "⏳"
+                    isPlaying -> "⏹"
+                    else -> "▶"
                 }
             )
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(Modifier.width(8.dp))
 
-        Button(
-            onClick = {
-                mediaPlayer?.apply {
-                    stop()
-                    release()
-                }
-                mediaPlayer = null
-                isPlaying = false
-                isPrepared = false
+        Column {
+            Text(
+                text = when {
+                    isLoading -> "Loading..."
+                    isPlaying -> "Playing..."
+                    else -> "🎧 Voice message"
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+            if (errorMsg.isNotEmpty()) {
+                Text(
+                    text = errorMsg,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
-        ) {
-            Text("⏹ Stop")
         }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Text("Voice message")
     }
 }

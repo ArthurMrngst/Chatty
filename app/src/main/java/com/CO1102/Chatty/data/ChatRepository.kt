@@ -1,10 +1,10 @@
 package com.CO1102.Chatty.data
 
-import com.google.firebase.firestore.ktx.toObject
+
 import com.CO1102.Chatty.domain.model.Message
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.toObject
+
 
 class ChatRepository {
 
@@ -26,7 +26,7 @@ class ChatRepository {
                 if (error != null) return@addSnapshotListener
 
                 val messages = snapshot?.documents?.mapNotNull {
-                    it.toObject<Message>()?.copy(id = it.id)
+                    it.toObject(Message::class.java)?.copy(id = it.id)
                 } ?: emptyList()
 
                 onResult(messages)
